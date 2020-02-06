@@ -5,4 +5,4 @@
 // Instead of using an in-memory heap structure to store data, everything is stored using the Go port of LevelDB (https://github.com/syndtr/goleveldb). This results in very little memory being used no matter the size of the database, while read and write performance remains near constant.
 //
 // See README.md or visit https://github.com/beeker1121/goque for more info.
-package goque
+package goque2

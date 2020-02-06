@@ -1,4 +1,4 @@
-package goque
+package goque2
 
 import (
 	"os"

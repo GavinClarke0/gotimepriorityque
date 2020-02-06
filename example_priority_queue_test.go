@@ -1,4 +1,4 @@
-package goque_test
+package goque2_test
 
 import (
 	"fmt"
@@ -9,7 +9,7 @@ import (
 // ExamplePriorityQueue demonstrates the implementation of a Goque queue.
 func Example_priorityQueue() {
 	// Open/create a priority queue.
-	pq, err := goque.OpenPriorityQueue("data_dir", goque.ASC)
+	pq, err := goque2.OpenPriorityQueue("data_dir", goque2.ASC)
 	if err != nil {
 		fmt.Println(err)
 		return
