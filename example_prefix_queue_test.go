@@ -1,4 +1,4 @@
-package goque2_test
+package goq_test
 
 import (
 	"fmt"
@@ -9,7 +9,7 @@ import (
 // ExamplePrefixQueue demonstrates the implementation of a Goque queue.
 func Example_prefixQueue() {
 	// Open/create a prefix queue.
-	pq, err := goque2.OpenPrefixQueue("data_dir")
+	pq, err := goq.OpenPrefixQueue("data_dir")
 	if err != nil {
 		fmt.Println(err)
 		return

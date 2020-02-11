@@ -1,4 +1,4 @@
-package goque2
+package goq
 
 import (
 	"bytes"
@@ -49,7 +49,7 @@ func (i *Item) ToObjectFromJSON(value interface{}) error {
 // PriorityItem represents an entry in a priority queue.
 type PriorityItem struct {
 	ID       uint64
-	Priority uint16
+	Priority int64
 	Key      []byte
 	Value    []byte
 }

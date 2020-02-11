@@ -1,4 +1,4 @@
-package goque2_test
+package goq_test
 
 import (
 	"fmt"
@@ -9,7 +9,7 @@ import (
 // ExampleObject demonstrates enqueuing a struct object.
 func Example_object() {
 	// Open/create a queue.
-	q, err := goque2.OpenQueue("data_dir")
+	q, err := goq.OpenQueue("data_dir")
 	if err != nil {
 		fmt.Println(err)
 		return
