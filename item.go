@@ -97,3 +97,7 @@ func idToKey(id uint64) []byte {
 func keyToID(key []byte) uint64 {
 	return binary.BigEndian.Uint64(key)
 }
+
+func idToLevel(key []byte) uint64 {
+	return binary.BigEndian.Uint64(key)
+}

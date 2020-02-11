@@ -9,6 +9,7 @@ import (
 )
 
 func TestPriorityQueueClose(t *testing.T) {
+
 	file := fmt.Sprintf("test_db_%d", time.Now().UnixNano())
 	pq, err := OpenPriorityQueue(file, ASC)
 	if err != nil {
@@ -18,7 +19,7 @@ func TestPriorityQueueClose(t *testing.T) {
 
 	for p := 0; p <= 4; p++ {
 		for i := 1; i <= 10; i++ {
-			if _, err = pq.EnqueueString(uint32(p), fmt.Sprintf("value for item %d", i)); err != nil {
+			if _, err = pq.EnqueueString(int64(p), fmt.Sprintf("value for item %d", i)); err != nil {
 				t.Error(err)
 			}
 		}
@@ -81,7 +82,7 @@ func TestPriorityQueueEnqueue(t *testing.T) {
 
 	for p := 0; p <= 4; p++ {
 		for i := 1; i <= 10; i++ {
-			if _, err = pq.EnqueueString(uint32(p), fmt.Sprintf("value for item %d", i)); err != nil {
+			if _, err = pq.EnqueueString(int64(p), fmt.Sprintf("value for item %d", i)); err != nil {
 				t.Error(err)
 			}
 		}
@@ -102,7 +103,7 @@ func TestPriorityQueueDequeueAsc(t *testing.T) {
 
 	for p := 0; p <= 4; p++ {
 		for i := 1; i <= 10; i++ {
-			if _, err = pq.EnqueueString(uint32(p), fmt.Sprintf("value for item %d", i)); err != nil {
+			if _, err = pq.EnqueueString(int64(p), fmt.Sprintf("value for item %d", i)); err != nil {
 				t.Error(err)
 			}
 		}
@@ -142,7 +143,7 @@ func TestPriorityQueueDequeueDesc(t *testing.T) {
 
 	for p := 0; p <= 4; p++ {
 		for i := 1; i <= 10; i++ {
-			if _, err = pq.EnqueueString(uint32(p), fmt.Sprintf("value for item %d", i)); err != nil {
+			if _, err = pq.EnqueueString(int64(p), fmt.Sprintf("value for item %d", i)); err != nil {
 				t.Error(err)
 			}
 		}
@@ -182,7 +183,7 @@ func TestPriorityQueueDequeueByPriority(t *testing.T) {
 
 	for p := 0; p <= 4; p++ {
 		for i := 1; i <= 10; i++ {
-			if _, err = pq.EnqueueString(uint32(p), fmt.Sprintf("value for item %d", i)); err != nil {
+			if _, err = pq.EnqueueString(int64(p), fmt.Sprintf("value for item %d", i)); err != nil {
 				t.Error(err)
 			}
 		}
@@ -266,7 +267,7 @@ func TestPriorityQueuePeek(t *testing.T) {
 
 	for p := 0; p <= 4; p++ {
 		for i := 1; i <= 10; i++ {
-			if _, err = pq.EnqueueString(uint32(p), fmt.Sprintf("value for item %d", i)); err != nil {
+			if _, err = pq.EnqueueString(int64(p), fmt.Sprintf("value for item %d", i)); err != nil {
 				t.Error(err)
 			}
 		}
@@ -385,7 +386,7 @@ func TestPriorityQueuePeekByOffsetBoundsAsc(t *testing.T) {
 
 	for p := 0; p <= 4; p++ {
 		for i := 1; i <= 10; i++ {
-			if _, err = pq.EnqueueString(uint32(p), fmt.Sprintf("value for item %d", i)); err != nil {
+			if _, err = pq.EnqueueString(int64(p), fmt.Sprintf("value for item %d", i)); err != nil {
 				t.Error(err)
 			}
 		}
@@ -431,7 +432,7 @@ func TestPriorityQueuePeekByOffsetBoundsDesc(t *testing.T) {
 
 	for p := 0; p <= 4; p++ {
 		for i := 1; i <= 10; i++ {
-			if _, err = pq.EnqueueString(uint32(p), fmt.Sprintf("value for item %d", i)); err != nil {
+			if _, err = pq.EnqueueString(int64(p), fmt.Sprintf("value for item %d", i)); err != nil {
 				t.Error(err)
 			}
 		}
@@ -458,7 +459,7 @@ func TestPriorityQueuePeekByOffsetAsc(t *testing.T) {
 
 	for p := 0; p <= 4; p++ {
 		for i := 1; i <= 10; i++ {
-			if _, err = pq.EnqueueString(uint32(p), fmt.Sprintf("value for item %d", i)); err != nil {
+			if _, err = pq.EnqueueString(int64(p), fmt.Sprintf("value for item %d", i)); err != nil {
 				t.Error(err)
 			}
 		}
@@ -522,7 +523,7 @@ func TestPriorityQueuePeekByOffsetDesc(t *testing.T) {
 
 	for p := 0; p <= 4; p++ {
 		for i := 1; i <= 10; i++ {
-			if _, err = pq.EnqueueString(uint32(p), fmt.Sprintf("value for item %d", i)); err != nil {
+			if _, err = pq.EnqueueString(int64(p), fmt.Sprintf("value for item %d", i)); err != nil {
 				t.Error(err)
 			}
 		}
@@ -586,7 +587,7 @@ func TestPriorityQueuePeekByPriorityID(t *testing.T) {
 
 	for p := 0; p <= 4; p++ {
 		for i := 1; i <= 10; i++ {
-			if _, err = pq.EnqueueString(uint32(p), fmt.Sprintf("value for item %d", i)); err != nil {
+			if _, err = pq.EnqueueString(int64(p), fmt.Sprintf("value for item %d", i)); err != nil {
 				t.Error(err)
 			}
 		}
@@ -622,7 +623,7 @@ func TestPriorityQueueUpdate(t *testing.T) {
 
 	for p := 0; p <= 4; p++ {
 		for i := 1; i <= 10; i++ {
-			if _, err = pq.EnqueueString(uint32(p), fmt.Sprintf("value for item %d", i)); err != nil {
+			if _, err = pq.EnqueueString(int64(p), fmt.Sprintf("value for item %d", i)); err != nil {
 				t.Error(err)
 			}
 		}
@@ -677,7 +678,7 @@ func TestPriorityQueueUpdateString(t *testing.T) {
 
 	for p := 0; p <= 4; p++ {
 		for i := 1; i <= 10; i++ {
-			if _, err = pq.EnqueueString(uint32(p), fmt.Sprintf("value for item %d", i)); err != nil {
+			if _, err = pq.EnqueueString(int64(p), fmt.Sprintf("value for item %d", i)); err != nil {
 				t.Error(err)
 			}
 		}
@@ -731,13 +732,13 @@ func TestPriorityQueueUpdateObject(t *testing.T) {
 	defer pq.Drop()
 
 	type object struct {
-		Priority uint32
+		Priority int64
 		Value    int
 	}
 
 	for p := 0; p <= 4; p++ {
 		for i := 1; i <= 10; i++ {
-			if _, err = pq.EnqueueObject(uint32(p), object{uint32(p), i}); err != nil {
+			if _, err = pq.EnqueueObject(int64(p), object{int64(p), i}); err != nil {
 				t.Error(err)
 			}
 		}
@@ -808,7 +809,7 @@ func TestPriorityQueueUpdateObjectAsJSON(t *testing.T) {
 	}
 
 	type object struct {
-		Priority  uint32
+		Priority  int64
 		Value     int
 		SubObject subObject
 	}
@@ -816,14 +817,14 @@ func TestPriorityQueueUpdateObjectAsJSON(t *testing.T) {
 	for p := 0; p <= 4; p++ {
 		for i := 1; i <= 10; i++ {
 			obj := object{
-				Priority: uint32(p),
+				Priority: int64(p),
 				Value:    i,
 				SubObject: subObject{
 					Value: &i,
 				},
 			}
 
-			if _, err = pq.EnqueueObjectAsJSON(uint32(p), obj); err != nil {
+			if _, err = pq.EnqueueObjectAsJSON(int64(p), obj); err != nil {
 				t.Error(err)
 			}
 		}
@@ -905,7 +906,7 @@ func TestPriorityQueueUpdateOutOfBounds(t *testing.T) {
 
 	for p := 0; p <= 4; p++ {
 		for i := 1; i <= 10; i++ {
-			if _, err = pq.EnqueueString(uint32(p), fmt.Sprintf("value for item %d", i)); err != nil {
+			if _, err = pq.EnqueueString(int64(p), fmt.Sprintf("value for item %d", i)); err != nil {
 				t.Error(err)
 			}
 		}
@@ -943,7 +944,7 @@ func TestPriorityQueueHigherPriorityAsc(t *testing.T) {
 
 	for p := 5; p <= 9; p++ {
 		for i := 1; i <= 10; i++ {
-			if _, err = pq.EnqueueString(uint32(p), fmt.Sprintf("value for item %d", i)); err != nil {
+			if _, err = pq.EnqueueString(int64(p), fmt.Sprintf("value for item %d", i)); err != nil {
 				t.Error(err)
 			}
 		}
@@ -983,7 +984,7 @@ func TestPriorityQueueHigherPriorityDesc(t *testing.T) {
 
 	for p := 5; p <= 9; p++ {
 		for i := 1; i <= 10; i++ {
-			if _, err = pq.EnqueueString(uint32(p), fmt.Sprintf("value for item %d", i)); err != nil {
+			if _, err = pq.EnqueueString(int64(p), fmt.Sprintf("value for item %d", i)); err != nil {
 				t.Error(err)
 			}
 		}
@@ -1084,7 +1085,7 @@ func BenchmarkPriorityQueueDequeue(b *testing.B) {
 
 	// Fill with dummy data
 	for n := 0; n < b.N; n++ {
-		if _, err = pq.EnqueueString(uint32(math.Mod(float64(n), 255)), "value"); err != nil {
+		if _, err = pq.EnqueueString(int64(math.Mod(float64(n), 255)), "value"); err != nil {
 			b.Error(err)
 		}
 	}
