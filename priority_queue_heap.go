@@ -1,4 +1,4 @@
-package goq
+package goqueDynamicPriority
 
 import (
 	"container/heap"
@@ -32,17 +32,21 @@ func (pq *priorityLevels) Push(x interface{}) {
 func (pq *priorityLevels) Pop() interface{} {
 	old := *pq
 	n := len(old)
-	item := old[n-1]
-	old[n-1] = nil  // avoid memory leak
+	item := old[0]
+	old[0] = nil    // avoid memory leak
 	item.Index = -1 // for safety
-	*pq = old[0 : n-1]
+	*pq = old[1:n]
 
 	return item
 }
 
 func Peek(pq *priorityLevels) interface{} {
+
 	n := len(*pq)
-	item := (*pq)[n-1]
+	if n == 0 {
+		return nil
+	}
+	item := (*pq)[0]
 	return item
 }
 
@@ -64,8 +68,10 @@ func (pq *priorityLevels) getLevelList() priorityLevels {
 
 // return pointer to level at index
 func (pq *priorityLevels) getLevel(level int64) *priorityLevel {
+
+	// need to handle ascending or descending case
 	index := sort.Search((*pq).Len(), func(i int) bool { return (*pq)[i].level >= level })
-	if index == (*pq).Len() {
+	if index == (*pq).Len() || (*pq)[index].level != level {
 		return nil
 	}
 	return (*pq)[index]
