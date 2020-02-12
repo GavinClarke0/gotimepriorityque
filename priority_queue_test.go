@@ -925,6 +925,7 @@ func TestPriorityQueueUpdateOutOfBounds(t *testing.T) {
 		t.Errorf("Expected queue length of 49, got %d", pq.Length())
 	}
 
+	// TODO: figure out if this test is correct
 	if _, err = pq.Update(deqItem.Priority, deqItem.ID, []byte(`new value`)); err != ErrOutOfBounds {
 		t.Errorf("Expected to get queue out of bounds error, got %s", err.Error())
 	}

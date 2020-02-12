@@ -429,7 +429,59 @@ func (pq *PriorityQueue) resetCurrentLevel() {
 
 // findOffset finds the given offset from the current queue position
 // based on priority order.
+
+// TODO: modify function so it depends on AESC / DESC
+
 func (pq *PriorityQueue) findOffset(offset uint64) (*PriorityItem, error) {
+	var length uint64
+	var curLevel = pq.curLevel
+	var newLevel = 0
+
+	if pq.order == DESC {
+		newLevel = (*pq).levels.Len() - 1
+	}
+
+	condExpr := func(index int) bool {
+		if pq.order == ASC {
+			return index <= (*pq).levels.Len()-1
+		}
+		return index >= 0
+	}
+
+	// For loop expression.
+	loopExpr := func(index *int) {
+		if pq.order == ASC {
+			*index++
+		} else if pq.order == DESC {
+			*index--
+		}
+	}
+
+	// Level comparison.
+	cmpLevels := func(newLevel, curLevel int64) bool {
+		if pq.order == ASC {
+			return newLevel >= curLevel
+		}
+		return newLevel <= curLevel
+	}
+
+	for ; condExpr(newLevel); loopExpr(&newLevel) {
+		// If this level is lower than the current level based on ordering and contains items.
+		if cmpLevels(int64(newLevel), curLevel) && pq.levels.Len() > 0 {
+
+			curLevel = int64(newLevel)
+
+			// determine if this works
+			newLength := (*pq).levels.getLevelList()[curLevel].length()
+
+			// If the offset is within the current priority level.
+			if length+newLength >= offset+1 {
+				return pq.getItemByPriorityID(curLevel, offset-length+1)
+			}
+			length += newLength
+		}
+	}
+
 	// var length uint64
 	//var curLevel int64 = pq.curLevel
 	//var newLevel int
@@ -444,45 +496,7 @@ func (pq *PriorityQueue) findOffset(offset uint64) (*PriorityItem, error) {
 		}
 
 		// For condition expression.
-		condExpr := func(level int) bool {
-			if pq.order == ASC {
-				return level <= int64Max-1
-			}
-			return level >= 0
-		}
 
-		// For loop expression.
-		loopExpr := func(level *int) {
-			if pq.order == ASC {
-				*level++
-			} else if pq.order == DESC {
-				*level--
-			}
-		}
-
-		// Level comparison.
-		cmpLevels := func(newLevel, curLevel int64) bool {
-			if pq.order == ASC {
-				return newLevel >= curLevel
-			}
-			return newLevel <= curLevel
-		}
-
-		// Loop through the priority levels.
-		for ; condExpr(newLevel); loopExpr(&newLevel) {
-			// If this level is lower than the current level based on ordering and contains items.
-			if cmpLevels(int64(newLevel), curLevel) && pq.levels.Len() > 0 {
-				curLevel = int64(newLevel)
-				newLength := pq.levels.getLevel(curLevel).length()
-
-				// If the offset is within the current priority level.
-				if length+newLength >= offset+1 {
-					return pq.getItemByPriorityID(curLevel, offset-length+1)
-				}
-
-				length += newLength
-			}
-		}
 
 	*/
 	return nil, ErrOutOfBounds
