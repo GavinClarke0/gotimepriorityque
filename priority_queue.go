@@ -280,15 +280,15 @@ func (pq *PriorityQueue) getNextItem() (*PriorityItem, error) {
 	}
 
 	// TODO: position 0 is null and allows length comparison
-	id := level.(priorityLevel).head + 1
+	id := (*level.(*priorityLevel)).head + 1
 
-	if id <= level.(priorityLevel).head || id > level.(priorityLevel).tail {
+	if id <= (*level.(*priorityLevel)).head || id > (*level.(*priorityLevel)).tail {
 		return nil, ErrOutOfBounds
 	}
 
 	// Get item from database.
 	var err error
-	item := &PriorityItem{ID: id, Priority: level.(priorityLevel).level, Key: pq.generateKey(level.(priorityLevel).level, id)}
+	item := &PriorityItem{ID: id, Priority: (*level.(*priorityLevel)).level, Key: pq.generateKey((*level.(*priorityLevel)).level, id)}
 	if item.Value, err = pq.db.Get(item.Key, nil); err != nil {
 		return nil, err
 	}
@@ -320,7 +320,6 @@ func (pq *PriorityQueue) generateKey(priority int64, id uint64) []byte {
 // TODO: this will need a drastic logic change
 func (pq *PriorityQueue) init() error {
 	// Set starting value for curLevel.
-	pq.resetCurrentLevel()
 
 	iter := pq.db.NewIterator(nil, nil)
 
