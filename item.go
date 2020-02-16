@@ -1,4 +1,4 @@
-package goqueDynamicPriority
+package goquelargepriority
 
 import (
 	"bytes"

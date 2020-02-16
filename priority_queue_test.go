@@ -1,4 +1,4 @@
-package goqueDynamicPriority
+package goquelargepriority
 
 import (
 	"fmt"
@@ -7,6 +7,29 @@ import (
 	"testing"
 	"time"
 )
+
+func TestEnqueDeuque(t *testing.T) {
+
+	file := fmt.Sprintf("test_db_%d", time.Now().UnixNano())
+	pq, err := OpenPriorityQueue(file, ASC)
+	if err != nil {
+		t.Error(err)
+	}
+	defer pq.Drop()
+
+	for p := 0; p <= 50; p++ {
+		if _, err = pq.EnqueueString(int64(p), "test"); err != nil {
+			t.Error(err)
+		}
+	}
+	for p := 0; p <= 50; p++ {
+		if item, err := pq.Dequeue(); err == nil {
+			if item.Priority != int64(p) {
+				t.Error("Incorrect Priority Dequeued")
+			}
+		}
+	}
+}
 
 func TestPriorityQueueClose(t *testing.T) {
 
@@ -111,7 +134,7 @@ func TestPriorityQueueDequeueAsc(t *testing.T) {
 	compStr := "value for item 1"
 
 	if deqItem.Priority != 0 {
-		t.Errorf("Expected priority level to be 0, got %d", deqItem.Priority)
+		t.Errorf("Expected priority priority to be 0, got %d", deqItem.Priority)
 	}
 
 	if deqItem.ToString() != compStr {
@@ -120,6 +143,7 @@ func TestPriorityQueueDequeueAsc(t *testing.T) {
 }
 
 /*
+
 func TestPriorityQueueDequeueDesc(t *testing.T) {
 	file := fmt.Sprintf("test_db_%d", time.Now().UnixNano())
 	pq, err := OpenPriorityQueue(file, DESC)
@@ -152,7 +176,7 @@ func TestPriorityQueueDequeueDesc(t *testing.T) {
 	compStr := "value for item 1"
 
 	if deqItem.Priority != 4 {
-		t.Errorf("Expected priority level to be 4, got %d", deqItem.Priority)
+		t.Errorf("Expected priority priority to be 4, got %d", deqItem.Priority)
 	}
 
 	if deqItem.ToString() != compStr {
@@ -214,7 +238,7 @@ func TestPriorityQueuePeek(t *testing.T) {
 
 	for p := 0; p <= 4; p++ {
 		for i := 1; i <= 10; i++ {
-			if _, err = pq.EnqueueString(int64(p), fmt.Sprintf("value for item %d", i)); err != nil {
+			if _, err = pq.EnqueueString(int64(p)+1581551271, fmt.Sprintf("value for item %d", i)); err != nil {
 				t.Error(err)
 			}
 		}
@@ -227,8 +251,8 @@ func TestPriorityQueuePeek(t *testing.T) {
 		t.Error(err)
 	}
 
-	if peekItem.Priority != 0 {
-		t.Errorf("Expected priority level to be 0, got %d", peekItem.Priority)
+	if peekItem.Priority != 0+1581551271 {
+		t.Errorf("Expected priority priority to be 1581551271, got %d", peekItem.Priority)
 	}
 
 	if peekItem.ToString() != compStr {
@@ -262,7 +286,7 @@ func TestPriorityQueueHigherPriorityAsc(t *testing.T) {
 	}
 
 	if item.Priority != 5 {
-		t.Errorf("Expected priority level to be 5, got %d", item.Priority)
+		t.Errorf("Expected priority priority to be 5, got %d", item.Priority)
 	}
 
 	_, err = pq.EnqueueString(2, "value")
@@ -276,7 +300,7 @@ func TestPriorityQueueHigherPriorityAsc(t *testing.T) {
 	}
 
 	if higherItem.Priority != 2 {
-		t.Errorf("Expected priority level to be 2, got %d", higherItem.Priority)
+		t.Errorf("Expected priority priority to be 2, got %d", higherItem.Priority)
 	}
 }
 
@@ -303,7 +327,7 @@ func TestPriorityQueueHigherPriorityDesc(t *testing.T) {
 	}
 
 	if item.Priority != 9 {
-		t.Errorf("Expected priority level to be 9, got %d", item.Priority)
+		t.Errorf("Expected priority priority to be 9, got %d", item.Priority)
 	}
 
 	_, err = pq.EnqueueString(12, "value")
@@ -317,7 +341,7 @@ func TestPriorityQueueHigherPriorityDesc(t *testing.T) {
 	}
 
 	if higherItem.Priority != 12 {
-		t.Errorf("Expected priority level to be 12, got %d", higherItem.Priority)
+		t.Errorf("Expected priority priority to be 12, got %d", higherItem.Priority)
 	}
 }
 */
