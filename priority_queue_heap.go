@@ -1,4 +1,4 @@
-package goquelargepriority
+package goq
 
 import (
 	"container/heap"
@@ -36,7 +36,6 @@ func (pq *priorityLevels) Pop() interface{} {
 	return item
 }
 
-// TODO: fix/ look into peak
 func Peek(pq *priorityLevels) interface{} {
 	n := len(*pq)
 	if n == 0 {
@@ -58,23 +57,15 @@ func createPriorityLevels(length int) *priorityLevels {
 	return &pq
 }
 
-//TODO: figure out if should or should not return a pointer
 func (pq *priorityLevels) getLevelList() priorityLevels {
 	return *pq
 }
 
-// return pointer to priority at index
 func (pq *priorityLevels) getLevel(priority int64) *priorityLevel {
 	for i := range *pq {
 		if (*pq)[i].priority == priority {
 			return (*pq)[i]
 		}
 	}
-	/*index := sort.Search((*pq).Len(), func(i int) bool { return (*pq)[i].priority >= priority })
-	if index == (*pq).Len() || (*pq)[index].priority != priority {
-		return nil
-	}
-	return (*pq)[index]
-	*/
 	return nil
 }

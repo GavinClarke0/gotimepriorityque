@@ -1,4 +1,4 @@
-package goquelargepriority
+package goq
 
 import (
 	"bytes"
@@ -25,10 +25,7 @@ const (
 	DESC              // Set priority priority 255 as most important.
 )
 
-// priorityLevel holds the head and tail position of a priority
-// priority within the queue.
-
-//TODO: figure out if Index is required
+// priorityLevel holds the head and tail position of a priority, or the number of items currently at a single priority
 type priorityLevel struct {
 	priority int64
 	head     uint64
@@ -77,14 +74,18 @@ func OpenPriorityQueue(dataDir string, order order) (*PriorityQueue, error) {
 	pq.levels = createPriorityLevels(0)
 
 	// Check if this Goque type can open the requested data directory.
-	ok, err := checkGoqueType(dataDir, goquePriorityQueue)
-	if err != nil {
-		return pq, err
-	}
-	if !ok {
-		return pq, ErrIncompatibleType
-	}
 
+	/*
+		ok, err := checkGoqueType(dataDir, goquePriorityQueue)
+		if err != nil {
+			return pq, err
+		}
+		if !ok {
+			return pq, ErrIncompatibleType
+		}
+
+
+	*/
 	// Set isOpen and return.
 	pq.isOpen = true
 	return pq, pq.init()
@@ -94,12 +95,10 @@ func OpenPriorityQueue(dataDir string, order order) (*PriorityQueue, error) {
 func (pq *PriorityQueue) Enqueue(priority int64, value []byte) (*PriorityItem, error) {
 	pq.Lock()
 	defer pq.Unlock()
-
 	// Check if queue is closed.
 	if !pq.isOpen {
 		return nil, ErrDBClosed
 	}
-
 	// Get the priorityLevel.
 	level := pq.levels.getLevel(priority)
 	// create new priority object if it is not in heap
@@ -109,8 +108,7 @@ func (pq *PriorityQueue) Enqueue(priority int64, value []byte) (*PriorityItem, e
 			tail:     0,
 			priority: priority,
 		}
-
-		// issue exists with
+		// add new priority object to heap
 		heap.Push((*pq).levels, pl)
 		level = pl
 	}
@@ -121,12 +119,10 @@ func (pq *PriorityQueue) Enqueue(priority int64, value []byte) (*PriorityItem, e
 		Key:      pq.generateKey(priority, (*level).tail+1),
 		Value:    value,
 	}
-
 	// Add it to the priority queue.
 	if err := pq.db.Put(item.Key, item.Value, nil); err != nil {
 		return nil, err
 	}
-	// Increment tail position.
 	(*level).tail++
 
 	return item, nil
@@ -152,7 +148,6 @@ func (pq *PriorityQueue) EnqueueObject(priority int64, value interface{}) (*Prio
 	if err := enc.Encode(value); err != nil {
 		return nil, err
 	}
-
 	return pq.Enqueue(priority, buffer.Bytes())
 }
 
@@ -166,44 +161,37 @@ func (pq *PriorityQueue) EnqueueObjectAsJSON(priority int64, value interface{}) 
 	if err != nil {
 		return nil, err
 	}
-
 	return pq.Enqueue(priority, jsonBytes)
 }
 
 // Dequeue removes the next item in the priority queue and returns it.
 func (pq *PriorityQueue) Dequeue() (*PriorityItem, error) {
-	pq.Lock()
-	defer pq.Unlock()
-
+	pq.RLock()
+	defer pq.RUnlock()
 	// Check if queue is closed.
 	if !pq.isOpen {
 		return nil, ErrDBClosed
 	}
-
 	// Try to get the next item.
-	item, err := pq.getNextItem()
+	item, err := getNextItem(pq)
 
 	if err != nil {
 		return nil, err
 	}
-
 	// Remove this item from the priority queue.
 	if err = pq.db.Delete(item.Key, nil); err != nil {
 		return nil, err
 	}
-
-	// TODO: check ifinteraction between values works and how peek and ncrement head might not
+	// peak queue to determine if the current removed item causes a level to be empty
+	// top level being "peaked at here should be ok as i is O(n)
 	level := Peek(pq.levels)
 
 	if level != nil {
-		// todo: test if this actually modifies priority
 		(level).(*priorityLevel).head++
-
 		if (level).(*priorityLevel).length() == 0 {
 			heap.Pop((*pq).levels)
 		}
 	}
-
 	return item, nil
 }
 
@@ -216,20 +204,17 @@ func (pq *PriorityQueue) Peek() (*PriorityItem, error) {
 	if !pq.isOpen {
 		return nil, ErrDBClosed
 	}
-
-	return pq.getNextItem()
+	return getNextItem(pq)
 }
 
-// Length returns the total number of items in the priority queue.
 func (pq *PriorityQueue) Length() uint64 {
 	pq.RLock()
 	defer pq.RUnlock()
 
 	var length uint64
 	for _, v := range pq.levels.getLevelList() {
-		length += (v.tail - v.head)
+		length += v.tail - v.head
 	}
-
 	return length
 }
 
@@ -237,12 +222,10 @@ func (pq *PriorityQueue) Length() uint64 {
 func (pq *PriorityQueue) Close() error {
 	pq.Lock()
 	defer pq.Unlock()
-
 	// Check if queue is already closed.
 	if !pq.isOpen {
 		return nil
 	}
-
 	// Close the LevelDB database.
 	if err := pq.db.Close(); err != nil {
 		return err
@@ -265,13 +248,10 @@ func (pq *PriorityQueue) Drop() error {
 
 // resetCurrentLevel resets the current priority priority of the queue
 // so the highest priority can be found.
-func (pq *PriorityQueue) resetCurrentLevel() {
-
-}
 
 // getNextItem returns the next item in the priority queue, updating
 // the current priority priority of the queue if necessary.
-func (pq *PriorityQueue) getNextItem() (*PriorityItem, error) {
+func getNextItem(pq *PriorityQueue) (*PriorityItem, error) {
 
 	level := Peek(pq.levels)
 
@@ -283,14 +263,12 @@ func (pq *PriorityQueue) getNextItem() (*PriorityItem, error) {
 	if id <= (*level.(*priorityLevel)).head || id > (*level.(*priorityLevel)).tail {
 		return nil, ErrOutOfBounds
 	}
-
 	// Get item from database.
 	var err error
 	item := &PriorityItem{ID: id, Priority: (*level.(*priorityLevel)).priority, Key: pq.generateKey((*level.(*priorityLevel)).priority, id)}
 	if item.Value, err = pq.db.Get(item.Key, nil); err != nil {
 		return nil, err
 	}
-
 	return item, nil
 }
 
@@ -312,7 +290,6 @@ func (pq *PriorityQueue) generateKey(priority int64, id uint64) []byte {
 }
 
 // init initializes the priority queue data.
-// TODO: this will need a drastic logic change
 func (pq *PriorityQueue) init() error {
 	// Set starting value for curLevel.
 
@@ -322,8 +299,8 @@ func (pq *PriorityQueue) init() error {
 		// Remember that the contents of the returned slice should not be modified, and
 		// only valid until the
 		// next call to Next.
-		position := keyToID(iter.Key()[10:]) - 1
-		priority := idToLevel(iter.Key()[:9])
+		position := keyToID(iter.Key()[9:]) - 1
+		priority := idToLevel(iter.Key()[:8])
 
 		level := pq.levels.getLevel(int64(priority))
 
@@ -344,9 +321,6 @@ func (pq *PriorityQueue) init() error {
 		if position < (*level).head {
 			(*level).head = position
 		}
-
-		// Set priority priority head to the first item.
-
 		if iter.Error() != nil {
 			return iter.Error()
 		}

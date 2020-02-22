@@ -1,11 +1,11 @@
-package goquelargepriority
+package goq
 
 import (
 	"container/heap"
 	"testing"
 )
 
-func TestHeap(t *testing.T) {
+func TestEnqueueAndDequeueOfHeap(t *testing.T) {
 
 	pq := make(priorityLevels, 0)
 	heap.Init(&pq)
@@ -21,9 +21,7 @@ func TestHeap(t *testing.T) {
 	}
 
 	for p := 0; p <= 50; p++ {
-
 		item := heap.Pop(&pq)
-
 		if (item).(*priorityLevel).priority != int64(p) {
 			t.Errorf("Expected other Priority")
 		}

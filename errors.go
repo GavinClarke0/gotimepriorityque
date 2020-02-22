@@ -1,4 +1,4 @@
-package goquelargepriority
+package goq
 
 import (
 	"errors"
