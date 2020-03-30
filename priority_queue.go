@@ -42,12 +42,13 @@ func (pl *priorityLevel) length() uint64 {
 // priority levels.
 type PriorityQueue struct {
 	sync.RWMutex
-	DataDir  string
-	db       *leveldb.DB
-	order    order
-	levels   *priorityLevels
-	curLevel int64
-	isOpen   bool
+	DataDir    string
+	db         *leveldb.DB
+	order      order
+	levelOrder *priorities
+	levelMap   map[int64]*priorityLevel
+	curLevel   int64
+	isOpen     bool
 }
 
 // OpenPriorityQueue opens a priority queue if one exists at the given
@@ -58,11 +59,12 @@ func OpenPriorityQueue(dataDir string, order order) (*PriorityQueue, error) {
 
 	// Create a new PriorityQueue.
 	pq := &PriorityQueue{
-		DataDir: dataDir,
-		db:      &leveldb.DB{},
-		levels:  &priorityLevels{},
-		order:   order,
-		isOpen:  false,
+		DataDir:    dataDir,
+		db:         &leveldb.DB{},
+		levelOrder: &priorities{},
+		levelMap:   map[int64]*priorityLevel{},
+		order:      order,
+		isOpen:     false,
 	}
 
 	// Open database for the priority queue.
@@ -71,21 +73,8 @@ func OpenPriorityQueue(dataDir string, order order) (*PriorityQueue, error) {
 		return pq, err
 	}
 
-	pq.levels = createPriorityLevels(0)
+	pq.levelOrder = createLevelOrders(0)
 
-	// Check if this Goque type can open the requested data directory.
-
-	/*
-		ok, err := checkGoqueType(dataDir, goquePriorityQueue)
-		if err != nil {
-			return pq, err
-		}
-		if !ok {
-			return pq, ErrIncompatibleType
-		}
-
-
-	*/
 	// Set isOpen and return.
 	pq.isOpen = true
 	return pq, pq.init()
@@ -100,18 +89,29 @@ func (pq *PriorityQueue) Enqueue(priority int64, value []byte) (*PriorityItem, e
 		return nil, ErrDBClosed
 	}
 	// Get the priorityLevel.
-	level := pq.levels.getLevel(priority)
-	// create new priority object if it is not in heap
-	if level == nil {
+
+	if pq.levelMap[priority] == nil {
+
 		pl := &priorityLevel{
 			head:     0,
 			tail:     0,
 			priority: priority,
 		}
+
+		orderLevel := &orderLevel{
+			priority: priority,
+			Index:    0,
+		}
 		// add new priority object to heap
-		heap.Push((*pq).levels, pl)
-		level = pl
+		heap.Push((*pq).levelOrder, orderLevel)
+
+		//TODO: test weird pointer syntax
+		(*pq).levelMap[priority] = pl
+
 	}
+
+	level := pq.levelMap[priority]
+
 	// Create new PriorityItem.
 	item := &PriorityItem{
 		ID:       (*level).tail + 1,
@@ -184,12 +184,15 @@ func (pq *PriorityQueue) Dequeue() (*PriorityItem, error) {
 	}
 	// peak queue to determine if the current removed item causes a level to be empty
 	// top level being "peaked at here should be ok as i is O(n)
-	level := Peek(pq.levels)
+	priority := Peek(pq.levelOrder)
 
-	if level != nil {
-		(level).(*priorityLevel).head++
-		if (level).(*priorityLevel).length() == 0 {
-			heap.Pop((*pq).levels)
+	if priority != nil {
+
+		level := pq.levelMap[priority.(*orderLevel).priority]
+		(level).head++
+		if (level).length() == 0 {
+			delete(pq.levelMap, priority.(*orderLevel).priority)
+			heap.Pop((*pq).levelOrder)
 		}
 	}
 	return item, nil
@@ -212,8 +215,11 @@ func (pq *PriorityQueue) Length() uint64 {
 	defer pq.RUnlock()
 
 	var length uint64
-	for _, v := range pq.levels.getLevelList() {
-		length += v.tail - v.head
+	for _, v := range pq.levelMap {
+
+		if v != nil {
+			length += v.tail - v.head
+		}
 	}
 	return length
 }
@@ -232,7 +238,8 @@ func (pq *PriorityQueue) Close() error {
 	}
 	// Reset head and tail of each priority priority
 	// and set isOpen to false.
-	pq.levels = createPriorityLevels(0)
+	pq.levelOrder = createLevelOrders(0)
+	pq.levelMap = make(map[int64]*priorityLevel)
 	pq.isOpen = false
 
 	return nil
@@ -253,19 +260,26 @@ func (pq *PriorityQueue) Drop() error {
 // the current priority priority of the queue if necessary.
 func getNextItem(pq *PriorityQueue) (*PriorityItem, error) {
 
-	level := Peek(pq.levels)
+	priority := Peek(pq.levelOrder)
 
-	if level == nil {
+	//TODO: clean this type casting up
+	if priority == nil {
 		return nil, ErrEmpty
 	}
-	id := (*level.(*priorityLevel)).head + 1
 
-	if id <= (*level.(*priorityLevel)).head || id > (*level.(*priorityLevel)).tail {
+	if pq.levelMap[priority.(*orderLevel).priority] == nil {
+		return nil, ErrEmpty
+	}
+	level := pq.levelMap[priority.(*orderLevel).priority]
+
+	id := (*level).head + 1
+
+	if id <= (*level).head || id > (*level).tail {
 		return nil, ErrOutOfBounds
 	}
 	// Get item from database.
 	var err error
-	item := &PriorityItem{ID: id, Priority: (*level.(*priorityLevel)).priority, Key: pq.generateKey((*level.(*priorityLevel)).priority, id)}
+	item := &PriorityItem{ID: id, Priority: (*level).priority, Key: pq.generateKey((*level).priority, id)}
 	if item.Value, err = pq.db.Get(item.Key, nil); err != nil {
 		return nil, err
 	}
@@ -302,16 +316,22 @@ func (pq *PriorityQueue) init() error {
 		position := keyToID(iter.Key()[9:]) - 1
 		priority := idToLevel(iter.Key()[:8])
 
-		level := pq.levels.getLevel(int64(priority))
+		level := pq.levelMap[int64(priority)]
 
 		if level == nil {
 			// Create a new priorityLevel.
+			orderLevel := &orderLevel{
+				priority: int64(priority),
+				Index:    0,
+			}
 			level = &priorityLevel{
 				head:     0,
 				tail:     0,
 				priority: int64(priority),
 			}
-			heap.Push(pq.levels, level)
+
+			pq.levelMap[int64(priority)] = level
+			heap.Push(pq.levelOrder, orderLevel)
 		}
 
 		// if value is new head or tail set accordingly

@@ -8,6 +8,37 @@ import (
 	"time"
 )
 
+func TestEnqueueDequeSameLevel(t *testing.T) {
+
+	file := fmt.Sprintf("test_db_%d", time.Now().UnixNano())
+	pq, err := OpenPriorityQueue(file, ASC)
+	if err != nil {
+		t.Error(err)
+	}
+	defer pq.Drop()
+
+	for p := 0; p <= 10000; p++ {
+		if _, err = pq.EnqueueString(int64(p), "test"); err != nil {
+			t.Error(err)
+		}
+		if _, err = pq.EnqueueString(int64(p), "test"); err != nil {
+			t.Error(err)
+		}
+	}
+	for p := 0; p <= 10000; p++ {
+		if item, err := pq.Dequeue(); err == nil {
+			if item.Priority != int64(p) {
+				t.Error("Incorrect Priority Dequeue")
+			}
+		}
+		if item, err := pq.Dequeue(); err == nil {
+			if item.Priority != int64(p) {
+				t.Error("Incorrect Priority Dequeue")
+			}
+		}
+	}
+}
+
 func TestEnqueueDeque(t *testing.T) {
 
 	file := fmt.Sprintf("test_db_%d", time.Now().UnixNano())
@@ -17,12 +48,12 @@ func TestEnqueueDeque(t *testing.T) {
 	}
 	defer pq.Drop()
 
-	for p := 0; p <= 100; p++ {
+	for p := 0; p <= 1000000; p++ {
 		if _, err = pq.EnqueueString(int64(p), "test"); err != nil {
 			t.Error(err)
 		}
 	}
-	for p := 0; p <= 100; p++ {
+	for p := 0; p <= 1000000; p++ {
 		if item, err := pq.Dequeue(); err == nil {
 			if item.Priority != int64(p) {
 				t.Error("Incorrect Priority Dequeue")
@@ -40,11 +71,10 @@ func TestAlternatingEnqueueDeque(t *testing.T) {
 	}
 	defer pq.Drop()
 
-	for p := 0; p <= 100000; p++ {
+	for p := 0; p <= 1000000; p++ {
 		if _, err = pq.EnqueueString(int64(p), "test"); err != nil {
 			t.Error(err)
 		}
-
 		if item, err := pq.Dequeue(); err == nil {
 			if item.Priority != int64(p) {
 				t.Error("Incorrect Priority Dequeue")
@@ -109,6 +139,7 @@ func TestPriorityQueueClose(t *testing.T) {
 	}
 
 	if pq.Length() != 0 {
+		fmt.Println(err)
 		t.Errorf("Expected queue length of 0, got %d", pq.Length())
 	}
 }
@@ -405,11 +436,13 @@ func TestPriorityQueueEmpty(t *testing.T) {
 
 	_, err = pq.EnqueueString(0, "value for item")
 	if err != nil {
+		fmt.Println(err)
 		t.Error(err)
 	}
 
 	_, err = pq.Dequeue()
 	if err != nil {
+		fmt.Println(err)
 		t.Error(err)
 	}
 

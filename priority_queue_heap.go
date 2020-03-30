@@ -5,28 +5,33 @@ import (
 	_ "sort"
 )
 
-type priorityLevels []*priorityLevel
+type priorities []*orderLevel
 
-func (pq priorityLevels) Len() int { return len(pq) }
+type orderLevel struct {
+	priority int64
+	Index    int
+}
 
-func (pq priorityLevels) Less(i, j int) bool {
+func (pq priorities) Len() int { return len(pq) }
+
+func (pq priorities) Less(i, j int) bool {
 	return pq[i].priority < pq[j].priority
 }
 
-func (pq priorityLevels) Swap(i, j int) {
+func (pq priorities) Swap(i, j int) {
 	pq[i], pq[j] = pq[j], pq[i]
 	pq[i].Index = i
 	pq[j].Index = j
 }
 
-func (pq *priorityLevels) Push(x interface{}) {
+func (pq *priorities) Push(x interface{}) {
 	n := len(*pq)
-	item := x.(*priorityLevel)
+	item := x.(*orderLevel)
 	item.Index = n
 	*pq = append(*pq, item)
 }
 
-func (pq *priorityLevels) Pop() interface{} {
+func (pq *priorities) Pop() interface{} {
 	old := *pq
 	n := len(old)
 	item := old[n-1]
@@ -36,7 +41,7 @@ func (pq *priorityLevels) Pop() interface{} {
 	return item
 }
 
-func Peek(pq *priorityLevels) interface{} {
+func Peek(pq *priorities) interface{} {
 	n := len(*pq)
 	if n == 0 {
 		return nil
@@ -46,22 +51,22 @@ func Peek(pq *priorityLevels) interface{} {
 }
 
 // update modifies the priority and value of an responseItem in the queue.
-func (pq *priorityLevels) update(item *priorityLevel, priority int64) {
+func (pq *priorities) update(item *priorityLevel, priority int64) {
 	item.priority = priority
 	heap.Fix(pq, item.Index)
 }
 
-func createPriorityLevels(length int) *priorityLevels {
-	pq := make(priorityLevels, length)
+func createLevelOrders(length int) *priorities {
+	pq := make(priorities, length)
 	heap.Init(&pq)
 	return &pq
 }
 
-func (pq *priorityLevels) getLevelList() priorityLevels {
+func (pq *priorities) getLevelList() priorities {
 	return *pq
 }
 
-func (pq *priorityLevels) getLevel(priority int64) *priorityLevel {
+func (pq *priorities) getLevel(priority int64) *orderLevel {
 	for i := range *pq {
 		if (*pq)[i].priority == priority {
 			return (*pq)[i]
