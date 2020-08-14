@@ -20,7 +20,7 @@ however it is still affective in this role just to a lesser extent in a trade of
 Fetch the package from GitHub:
 
 ```sh
-go get github.com/beeker1121/goque
+go get github.com/GavinClarke0/gotimepriorityque
 ```
 
 Import to your project:
