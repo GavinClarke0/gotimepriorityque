@@ -1,4 +1,4 @@
-package goque2
+package gotimepriorityque
 
 import (
 	"bytes"
@@ -49,7 +49,7 @@ func (i *Item) ToObjectFromJSON(value interface{}) error {
 // PriorityItem represents an entry in a priority queue.
 type PriorityItem struct {
 	ID       uint64
-	Priority uint16
+	Priority int64
 	Key      []byte
 	Value    []byte
 }
@@ -95,5 +95,9 @@ func idToKey(id uint64) []byte {
 
 // keyToID converts and returns the given key to an ID.
 func keyToID(key []byte) uint64 {
+	return binary.BigEndian.Uint64(key)
+}
+
+func idToLevel(key []byte) uint64 {
 	return binary.BigEndian.Uint64(key)
 }

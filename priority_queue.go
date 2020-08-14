@@ -1,36 +1,39 @@
-package goque2
+package gotimepriorityque
 
 import (
 	"bytes"
+	"container/heap"
+	"encoding/binary"
 	"encoding/gob"
 	"encoding/json"
 	"os"
 	"sync"
 
 	"github.com/syndtr/goleveldb/leveldb"
-	"github.com/syndtr/goleveldb/leveldb/util"
+	_ "github.com/syndtr/goleveldb/leveldb/util"
 )
 
 // prefixSep is the prefix separator for each item key.
-var prefixSep []byte = []byte(":")
+var prefixSep = []byte(":")
 
 // order defines the priority ordering of the queue.
 type order int
 
 // Defines which priority order to dequeue in.
 const (
-	ASC  order = iota // Set priority level 0 as most important.
-	DESC              // Set priority level 255 as most important.
+	ASC  order = iota // Set priority priority 0 as most important.
+	DESC              // Set priority priority 255 as most important.
 )
 
-// priorityLevel holds the head and tail position of a priority
-// level within the queue.
+// priorityLevel holds the head and tail position of a priority, or the number of items currently at a single priority
 type priorityLevel struct {
-	head uint64
-	tail uint64
+	priority int64
+	head     uint64
+	tail     uint64
+	Index    int
 }
 
-// length returns the total number of items in this priority level.
+// length returns the total number of items in this priority priority.
 func (pl *priorityLevel) length() uint64 {
 	return pl.tail - pl.head
 }
@@ -39,12 +42,13 @@ func (pl *priorityLevel) length() uint64 {
 // priority levels.
 type PriorityQueue struct {
 	sync.RWMutex
-	DataDir  string
-	db       *leveldb.DB
-	order    order
-	levels   [65536]*priorityLevel
-	curLevel uint16
-	isOpen   bool
+	DataDir    string
+	db         *leveldb.DB
+	order      order
+	levelOrder *priorities
+	levelMap   map[int64]*priorityLevel
+	curLevel   int64
+	isOpen     bool
 }
 
 // OpenPriorityQueue opens a priority queue if one exists at the given
@@ -55,10 +59,12 @@ func OpenPriorityQueue(dataDir string, order order) (*PriorityQueue, error) {
 
 	// Create a new PriorityQueue.
 	pq := &PriorityQueue{
-		DataDir: dataDir,
-		db:      &leveldb.DB{},
-		order:   order,
-		isOpen:  false,
+		DataDir:    dataDir,
+		db:         &leveldb.DB{},
+		levelOrder: &priorities{},
+		levelMap:   map[int64]*priorityLevel{},
+		order:      order,
+		isOpen:     false,
 	}
 
 	// Open database for the priority queue.
@@ -67,14 +73,7 @@ func OpenPriorityQueue(dataDir string, order order) (*PriorityQueue, error) {
 		return pq, err
 	}
 
-	// Check if this Goque type can open the requested data directory.
-	ok, err := checkGoqueType(dataDir, goquePriorityQueue)
-	if err != nil {
-		return pq, err
-	}
-	if !ok {
-		return pq, ErrIncompatibleType
-	}
+	pq.levelOrder = createLevelOrders(0)
 
 	// Set isOpen and return.
 	pq.isOpen = true
@@ -82,45 +81,56 @@ func OpenPriorityQueue(dataDir string, order order) (*PriorityQueue, error) {
 }
 
 // Enqueue adds an item to the priority queue.
-func (pq *PriorityQueue) Enqueue(priority uint16, value []byte) (*PriorityItem, error) {
+func (pq *PriorityQueue) Enqueue(priority int64, value []byte) (*PriorityItem, error) {
 	pq.Lock()
 	defer pq.Unlock()
-
 	// Check if queue is closed.
 	if !pq.isOpen {
 		return nil, ErrDBClosed
 	}
-
 	// Get the priorityLevel.
-	level := pq.levels[priority]
+
+	if pq.levelMap[priority] == nil {
+
+		pl := &priorityLevel{
+			head:     0,
+			tail:     0,
+			priority: priority,
+		}
+
+		orderLevel := &orderLevel{
+			priority: priority,
+			Index:    0,
+		}
+		// add new priority object to heap
+		heap.Push((*pq).levelOrder, orderLevel)
+
+		//TODO: test weird pointer syntax
+		(*pq).levelMap[priority] = pl
+
+	}
+
+	level := pq.levelMap[priority]
 
 	// Create new PriorityItem.
 	item := &PriorityItem{
-		ID:       level.tail + 1,
+		ID:       (*level).tail + 1,
 		Priority: priority,
-		Key:      pq.generateKey(priority, level.tail+1),
+		Key:      pq.generateKey(priority, (*level).tail+1),
 		Value:    value,
 	}
-
 	// Add it to the priority queue.
 	if err := pq.db.Put(item.Key, item.Value, nil); err != nil {
 		return nil, err
 	}
-
-	// Increment tail position.
-	level.tail++
-
-	// If this priority level is more important than the curLevel.
-	if pq.cmpAsc(priority) || pq.cmpDesc(priority) {
-		pq.curLevel = priority
-	}
+	(*level).tail++
 
 	return item, nil
 }
 
 // EnqueueString is a helper function for Enqueue that accepts a
 // value as a string rather than a byte slice.
-func (pq *PriorityQueue) EnqueueString(priority uint16, value string) (*PriorityItem, error) {
+func (pq *PriorityQueue) EnqueueString(priority int64, value string) (*PriorityItem, error) {
 	return pq.Enqueue(priority, []byte(value))
 }
 
@@ -132,13 +142,12 @@ func (pq *PriorityQueue) EnqueueString(priority uint16, value string) (*Priority
 // when using this function. This is due to how the encoding/gob
 // package works. Because of this, you should only use this function
 // to encode simple types.
-func (pq *PriorityQueue) EnqueueObject(priority uint16, value interface{}) (*PriorityItem, error) {
+func (pq *PriorityQueue) EnqueueObject(priority int64, value interface{}) (*PriorityItem, error) {
 	var buffer bytes.Buffer
 	enc := gob.NewEncoder(&buffer)
 	if err := enc.Encode(value); err != nil {
 		return nil, err
 	}
-
 	return pq.Enqueue(priority, buffer.Bytes())
 }
 
@@ -147,67 +156,45 @@ func (pq *PriorityQueue) EnqueueObject(priority uint16, value interface{}) (*Pri
 // encoding/json.
 //
 // Use this function to handle encoding of complex types.
-func (pq *PriorityQueue) EnqueueObjectAsJSON(priority uint16, value interface{}) (*PriorityItem, error) {
+func (pq *PriorityQueue) EnqueueObjectAsJSON(priority int64, value interface{}) (*PriorityItem, error) {
 	jsonBytes, err := json.Marshal(value)
 	if err != nil {
 		return nil, err
 	}
-
 	return pq.Enqueue(priority, jsonBytes)
 }
 
 // Dequeue removes the next item in the priority queue and returns it.
 func (pq *PriorityQueue) Dequeue() (*PriorityItem, error) {
-	pq.Lock()
-	defer pq.Unlock()
-
+	pq.RLock()
+	defer pq.RUnlock()
 	// Check if queue is closed.
 	if !pq.isOpen {
 		return nil, ErrDBClosed
 	}
-
 	// Try to get the next item.
-	item, err := pq.getNextItem()
+	item, err := getNextItem(pq)
+
 	if err != nil {
 		return nil, err
 	}
-
 	// Remove this item from the priority queue.
 	if err = pq.db.Delete(item.Key, nil); err != nil {
 		return nil, err
 	}
+	// peak queue to determine if the current removed item causes a level to be empty
+	// top level being "peaked at here should be ok as i is O(n)
+	priority := Peek(pq.levelOrder)
 
-	// Increment head position.
-	pq.levels[pq.curLevel].head++
+	if priority != nil {
 
-	return item, nil
-}
-
-// DequeueByPriority removes the next item in the given priority level
-// and returns it.
-func (pq *PriorityQueue) DequeueByPriority(priority uint16) (*PriorityItem, error) {
-	pq.Lock()
-	defer pq.Unlock()
-
-	// Check if queue is closed.
-	if !pq.isOpen {
-		return nil, ErrDBClosed
+		level := pq.levelMap[priority.(*orderLevel).priority]
+		(level).head++
+		if (level).length() == 0 {
+			delete(pq.levelMap, priority.(*orderLevel).priority)
+			heap.Pop((*pq).levelOrder)
+		}
 	}
-
-	// Try to get the next item in the given priority level.
-	item, err := pq.getItemByPriorityID(priority, pq.levels[priority].head+1)
-	if err != nil {
-		return nil, err
-	}
-
-	// Remove this item from the priority queue.
-	if err = pq.db.Delete(item.Key, nil); err != nil {
-		return nil, err
-	}
-
-	// Increment head position.
-	pq.levels[priority].head++
-
 	return item, nil
 }
 
@@ -220,127 +207,20 @@ func (pq *PriorityQueue) Peek() (*PriorityItem, error) {
 	if !pq.isOpen {
 		return nil, ErrDBClosed
 	}
-
-	return pq.getNextItem()
+	return getNextItem(pq)
 }
 
-// PeekByOffset returns the item located at the given offset,
-// starting from the head of the queue, without removing it.
-func (pq *PriorityQueue) PeekByOffset(offset uint64) (*PriorityItem, error) {
-	pq.RLock()
-	defer pq.RUnlock()
-
-	// Check if queue is closed.
-	if !pq.isOpen {
-		return nil, ErrDBClosed
-	}
-
-	// Check if queue is empty.
-	if pq.Length() == 0 {
-		return nil, ErrEmpty
-	}
-
-	// If the offset is within the current priority level.
-	if pq.levels[pq.curLevel].length() >= offset+1 {
-		return pq.getItemByPriorityID(pq.curLevel, pq.levels[pq.curLevel].head+offset+1)
-	}
-
-	return pq.findOffset(offset)
-}
-
-// PeekByPriorityID returns the item with the given ID and priority without
-// removing it.
-func (pq *PriorityQueue) PeekByPriorityID(priority uint16, id uint64) (*PriorityItem, error) {
-	pq.RLock()
-	defer pq.RUnlock()
-
-	// Check if queue is closed.
-	if !pq.isOpen {
-		return nil, ErrDBClosed
-	}
-
-	return pq.getItemByPriorityID(priority, id)
-}
-
-// Update updates an item in the priority queue without changing its
-// position.
-func (pq *PriorityQueue) Update(priority uint16, id uint64, newValue []byte) (*PriorityItem, error) {
-	pq.Lock()
-	defer pq.Unlock()
-
-	// Check if queue is closed.
-	if !pq.isOpen {
-		return nil, ErrDBClosed
-	}
-
-	// Check if item exists in queue.
-	if id <= pq.levels[priority].head || id > pq.levels[priority].tail {
-		return nil, ErrOutOfBounds
-	}
-
-	// Create new PriorityItem.
-	item := &PriorityItem{
-		ID:       id,
-		Priority: priority,
-		Key:      pq.generateKey(priority, id),
-		Value:    newValue,
-	}
-
-	// Update this item in the queue.
-	if err := pq.db.Put(item.Key, item.Value, nil); err != nil {
-		return nil, err
-	}
-
-	return item, nil
-}
-
-// UpdateString is a helper function for Update that accepts a value
-// as a string rather than a byte slice.
-func (pq *PriorityQueue) UpdateString(priority uint16, id uint64, newValue string) (*PriorityItem, error) {
-	return pq.Update(priority, id, []byte(newValue))
-}
-
-// UpdateObject is a helper function for Update that accepts any
-// value type, which is then encoded into a byte slice using
-// encoding/gob.
-//
-// Objects containing pointers with zero values will decode to nil
-// when using this function. This is due to how the encoding/gob
-// package works. Because of this, you should only use this function
-// to encode simple types.
-func (pq *PriorityQueue) UpdateObject(priority uint16, id uint64, newValue interface{}) (*PriorityItem, error) {
-	var buffer bytes.Buffer
-	enc := gob.NewEncoder(&buffer)
-	if err := enc.Encode(newValue); err != nil {
-		return nil, err
-	}
-	return pq.Update(priority, id, buffer.Bytes())
-}
-
-// UpdateObjectAsJSON is a helper function for Update that accepts
-// any value type, which is then encoded into a JSON byte slice using
-// encoding/json.
-//
-// Use this function to handle encoding of complex types.
-func (pq *PriorityQueue) UpdateObjectAsJSON(priority uint16, id uint64, newValue interface{}) (*PriorityItem, error) {
-	jsonBytes, err := json.Marshal(newValue)
-	if err != nil {
-		return nil, err
-	}
-
-	return pq.Update(priority, id, jsonBytes)
-}
-
-// Length returns the total number of items in the priority queue.
 func (pq *PriorityQueue) Length() uint64 {
 	pq.RLock()
 	defer pq.RUnlock()
 
 	var length uint64
-	for _, v := range pq.levels {
-		length += v.length()
-	}
+	for _, v := range pq.levelMap {
 
+		if v != nil {
+			length += v.tail - v.head
+		}
+	}
 	return length
 }
 
@@ -348,23 +228,18 @@ func (pq *PriorityQueue) Length() uint64 {
 func (pq *PriorityQueue) Close() error {
 	pq.Lock()
 	defer pq.Unlock()
-
 	// Check if queue is already closed.
 	if !pq.isOpen {
 		return nil
 	}
-
 	// Close the LevelDB database.
 	if err := pq.db.Close(); err != nil {
 		return err
 	}
-
-	// Reset head and tail of each priority level
+	// Reset head and tail of each priority priority
 	// and set isOpen to false.
-	for i := 0; i <= 65535; i++ {
-		pq.levels[uint16(i)].head = 0
-		pq.levels[uint16(i)].tail = 0
-	}
+	pq.levelOrder = createLevelOrders(0)
+	pq.levelMap = make(map[int64]*priorityLevel)
 	pq.isOpen = false
 
 	return nil
@@ -375,189 +250,99 @@ func (pq *PriorityQueue) Drop() error {
 	if err := pq.Close(); err != nil {
 		return err
 	}
-
 	return os.RemoveAll(pq.DataDir)
 }
 
-// cmpAsc returns wehther the given priority level is higher than the
-// current priority level based on ascending order.
-func (pq *PriorityQueue) cmpAsc(priority uint16) bool {
-	return pq.order == ASC && priority < pq.curLevel
-}
-
-// cmpAsc returns wehther the given priority level is higher than the
-// current priority level based on descending order.
-func (pq *PriorityQueue) cmpDesc(priority uint16) bool {
-	return pq.order == DESC && priority > pq.curLevel
-}
-
-// resetCurrentLevel resets the current priority level of the queue
-// so the highest level can be found.
-func (pq *PriorityQueue) resetCurrentLevel() {
-	if pq.order == ASC {
-		pq.curLevel = 65535
-	} else if pq.order == DESC {
-		pq.curLevel = 0
-	}
-}
-
-// findOffset finds the given offset from the current queue position
-// based on priority order.
-func (pq *PriorityQueue) findOffset(offset uint64) (*PriorityItem, error) {
-	var length uint64
-	var curLevel uint16 = pq.curLevel
-	var newLevel int
-
-	// Handle newLevel initialization for descending order.
-	if pq.order == DESC {
-		newLevel = 65535
-	}
-
-	// For condition expression.
-	condExpr := func(level int) bool {
-		if pq.order == ASC {
-			return level <= 65535
-		}
-		return level >= 0
-	}
-
-	// For loop expression.
-	loopExpr := func(level *int) {
-		if pq.order == ASC {
-			*level++
-		} else if pq.order == DESC {
-			*level--
-		}
-	}
-
-	// Level comparison.
-	cmpLevels := func(newLevel, curLevel uint16) bool {
-		if pq.order == ASC {
-			return newLevel >= curLevel
-		}
-		return newLevel <= curLevel
-	}
-
-	// Loop through the priority levels.
-	for ; condExpr(newLevel); loopExpr(&newLevel) {
-		// If this level is lower than the current level based on ordering and contains items.
-		if cmpLevels(uint16(newLevel), curLevel) && pq.levels[uint16(newLevel)].length() > 0 {
-			curLevel = uint16(newLevel)
-			newLength := pq.levels[curLevel].length()
-
-			// If the offset is within the current priority level.
-			if length+newLength >= offset+1 {
-				return pq.getItemByPriorityID(curLevel, offset-length+1)
-			}
-
-			length += newLength
-		}
-	}
-
-	return nil, ErrOutOfBounds
-}
-
 // getNextItem returns the next item in the priority queue, updating
-// the current priority level of the queue if necessary.
-func (pq *PriorityQueue) getNextItem() (*PriorityItem, error) {
-	// If the current priority level is empty.
-	if pq.levels[pq.curLevel].length() == 0 {
-		// Set starting value for curLevel.
-		pq.resetCurrentLevel()
+// the current priority priority of the queue if necessary.
+func getNextItem(pq *PriorityQueue) (*PriorityItem, error) {
 
-		// Try to get the next priority level.
-		for i := 0; i <= 65535; i++ {
-			if (pq.cmpAsc(uint16(i)) || pq.cmpDesc(uint16(i))) && pq.levels[uint16(i)].length() > 0 {
-				pq.curLevel = uint16(i)
-			}
-		}
+	priority := Peek(pq.levelOrder)
 
-		// If still empty, return queue empty error.
-		if pq.levels[pq.curLevel].length() == 0 {
-			return nil, ErrEmpty
-		}
+	//TODO: clean this type casting up
+	if priority == nil {
+		return nil, ErrEmpty
 	}
 
-	// Try to get the next item in the current priority level.
-	return pq.getItemByPriorityID(pq.curLevel, pq.levels[pq.curLevel].head+1)
-}
-
-// getItemByID returns an item, if found, for the given ID.
-func (pq *PriorityQueue) getItemByPriorityID(priority uint16, id uint64) (*PriorityItem, error) {
-	// Check if empty or out of bounds.
-	if pq.levels[priority].length() == 0 {
+	if pq.levelMap[priority.(*orderLevel).priority] == nil {
 		return nil, ErrEmpty
-	} else if id <= pq.levels[priority].head || id > pq.levels[priority].tail {
+	}
+	level := pq.levelMap[priority.(*orderLevel).priority]
+
+	id := (*level).head + 1
+
+	if id <= (*level).head || id > (*level).tail {
 		return nil, ErrOutOfBounds
 	}
-
 	// Get item from database.
 	var err error
-	item := &PriorityItem{ID: id, Priority: priority, Key: pq.generateKey(priority, id)}
+	item := &PriorityItem{ID: id, Priority: (*level).priority, Key: pq.generateKey((*level).priority, id)}
 	if item.Value, err = pq.db.Get(item.Key, nil); err != nil {
 		return nil, err
 	}
-
 	return item, nil
 }
 
-// generatePrefix creates the key prefix for the given priority level.
-func (pq *PriorityQueue) generatePrefix(level uint16) []byte {
-	// priority + prefixSep = 1 + 1 = 2
-	prefix := make([]byte, 2)
-	prefix[0] = byte(level)
-	prefix[1] = prefixSep[0]
+// generatePrefix creates the key prefix for the given priority priority.
+func (pq *PriorityQueue) generatePrefix(level int64) []byte {
+	prefix := make([]byte, 9)
+	binary.BigEndian.PutUint64(prefix[:8], uint64(level))
+	prefix[8] = prefixSep[0]
 	return prefix
 }
 
 // generateKey create a key to be used with LevelDB.
-func (pq *PriorityQueue) generateKey(priority uint16, id uint64) []byte {
+func (pq *PriorityQueue) generateKey(priority int64, id uint64) []byte {
 	// prefix + key = 2 + 8 = 10
-	key := make([]byte, 10)
-	copy(key[0:2], pq.generatePrefix(priority))
-	copy(key[2:], idToKey(id))
+	key := make([]byte, 17)
+	copy(key[0:9], pq.generatePrefix(priority))
+	copy(key[9:], idToKey(id))
 	return key
 }
 
 // init initializes the priority queue data.
 func (pq *PriorityQueue) init() error {
 	// Set starting value for curLevel.
-	pq.resetCurrentLevel()
 
-	// Loop through each priority level.
-	for i := 0; i <= 65535; i++ {
-		// Create a new LevelDB Iterator for this priority level.
-		prefix := pq.generatePrefix(uint16(i))
-		iter := pq.db.NewIterator(util.BytesPrefix(prefix), nil)
+	iter := pq.db.NewIterator(nil, nil)
 
-		// Create a new priorityLevel.
-		pl := &priorityLevel{
-			head: 0,
-			tail: 0,
-		}
+	for iter.Next() {
+		// Remember that the contents of the returned slice should not be modified, and
+		// only valid until the
+		// next call to Next.
+		position := keyToID(iter.Key()[9:]) - 1
+		priority := idToLevel(iter.Key()[:8])
 
-		// Set priority level head to the first item.
-		if iter.First() {
-			pl.head = keyToID(iter.Key()[2:]) - 1
+		level := pq.levelMap[int64(priority)]
 
-			// Since this priority level has item(s), handle updating curLevel.
-			if pq.cmpAsc(uint16(i)) || pq.cmpDesc(uint16(i)) {
-				pq.curLevel = uint16(i)
+		if level == nil {
+			// Create a new priorityLevel.
+			orderLevel := &orderLevel{
+				priority: int64(priority),
+				Index:    0,
 			}
+			level = &priorityLevel{
+				head:     0,
+				tail:     0,
+				priority: int64(priority),
+			}
+
+			pq.levelMap[int64(priority)] = level
+			heap.Push(pq.levelOrder, orderLevel)
 		}
 
-		// Set priority level tail to the last item.
-		if iter.Last() {
-			pl.tail = keyToID(iter.Key()[2:])
+		// if value is new head or tail set accordingly
+		if position > (*level).tail {
+			(*level).tail = position
 		}
-
+		if position < (*level).head {
+			(*level).head = position
+		}
 		if iter.Error() != nil {
 			return iter.Error()
 		}
-
-		pq.levels[i] = pl
-		iter.Release()
 	}
+	iter.Release()
 
 	return nil
 }
