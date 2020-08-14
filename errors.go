@@ -1,4 +1,4 @@
-package goq
+package gotimepriorityque
 
 import (
 	"errors"

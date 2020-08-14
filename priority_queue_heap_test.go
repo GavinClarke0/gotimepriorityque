@@ -1,4 +1,4 @@
-package goq
+package gotimepriorityque
 
 import (
 	"container/heap"
@@ -10,7 +10,7 @@ func TestEnqueueAndDequeueOfHeap(t *testing.T) {
 	pq := make(priorities, 0)
 	heap.Init(&pq)
 
-	for p := 0; p <= 50; p++ {
+	for p := 0; p <= 100000; p++ {
 
 		item := &orderLevel{
 			priority: int64(p),
@@ -18,7 +18,7 @@ func TestEnqueueAndDequeueOfHeap(t *testing.T) {
 		heap.Push(&pq, item)
 	}
 
-	for p := 0; p <= 50; p++ {
+	for p := 0; p <= 100000; p++ {
 		item := heap.Pop(&pq)
 		if (item).(*orderLevel).priority != int64(p) {
 			t.Errorf("Expected other Priority")

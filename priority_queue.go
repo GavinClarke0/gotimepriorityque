@@ -1,4 +1,4 @@
-package goq
+package gotimepriorityque
 
 import (
 	"bytes"
@@ -14,7 +14,7 @@ import (
 )
 
 // prefixSep is the prefix separator for each item key.
-var prefixSep []byte = []byte(":")
+var prefixSep = []byte(":")
 
 // order defines the priority ordering of the queue.
 type order int
@@ -252,9 +252,6 @@ func (pq *PriorityQueue) Drop() error {
 	}
 	return os.RemoveAll(pq.DataDir)
 }
-
-// resetCurrentLevel resets the current priority priority of the queue
-// so the highest priority can be found.
 
 // getNextItem returns the next item in the priority queue, updating
 // the current priority priority of the queue if necessary.

@@ -1,4 +1,4 @@
-package goq
+package gotimepriorityque
 
 import (
 	"fmt"
@@ -7,6 +7,23 @@ import (
 	"testing"
 	"time"
 )
+
+func TestMassEnqueue(t *testing.T) {
+
+	file := fmt.Sprintf("test_db_%d", time.Now().UnixNano())
+	pq, err := OpenPriorityQueue(file, ASC)
+	if err != nil {
+		t.Error(err)
+	}
+	defer pq.Drop()
+
+	for p := 0; p <= 10000000; p++ {
+		if _, err = pq.EnqueueString(int64(p), "test"); err != nil {
+			t.Error(err)
+		}
+	}
+
+}
 
 func TestEnqueueDequeSameLevel(t *testing.T) {
 
@@ -37,6 +54,7 @@ func TestEnqueueDequeSameLevel(t *testing.T) {
 			}
 		}
 	}
+
 }
 
 func TestEnqueueDeque(t *testing.T) {
@@ -48,12 +66,12 @@ func TestEnqueueDeque(t *testing.T) {
 	}
 	defer pq.Drop()
 
-	for p := 0; p <= 1000000; p++ {
+	for p := 0; p <= 10000; p++ {
 		if _, err = pq.EnqueueString(int64(p), "test"); err != nil {
 			t.Error(err)
 		}
 	}
-	for p := 0; p <= 1000000; p++ {
+	for p := 0; p <= 10000; p++ {
 		if item, err := pq.Dequeue(); err == nil {
 			if item.Priority != int64(p) {
 				t.Error("Incorrect Priority Dequeue")
@@ -71,7 +89,7 @@ func TestAlternatingEnqueueDeque(t *testing.T) {
 	}
 	defer pq.Drop()
 
-	for p := 0; p <= 1000000; p++ {
+	for p := 0; p <= 10000; p++ {
 		if _, err = pq.EnqueueString(int64(p), "test"); err != nil {
 			t.Error(err)
 		}
@@ -82,34 +100,6 @@ func TestAlternatingEnqueueDeque(t *testing.T) {
 		}
 	}
 }
-
-/*
-TODO: the following comments
-Enqueue takes the bulk of time insertions
-- likely due to n search time of list to see what priority to change and the aquiring of locks
-
-- changes only aquire lock if not next item in queue and or more complex logic
-- notes current iteration 100000 enqueus following dequeues takes less time than 100000 enqueus then 100000 dequeues
-pointing to the search time being the limiting factor
-
-func TestEnqueueSpeed(t *testing.T) {
-
-	file := fmt.Sprintf("test_db_%d", time.Now().UnixNano())
-	pq, err := OpenPriorityQueue(file, ASC)
-	if err != nil {
-		t.Error(err)
-	}
-	defer pq.Drop()
-
-	for p := 0; p <= 1000; p++ {
-		if _, err = pq.EnqueueString(int64(p), "test"); err != nil {
-			t.Error(err)
-		}
-	}
-}
-
-
-*/
 
 func TestPriorityQueueClose(t *testing.T) {
 
