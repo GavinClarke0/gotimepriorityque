@@ -1,4 +1,4 @@
-module github.com/beeker1121/goque
+module github.com/GavinClarke0/gotimepriorityque
 
 go 1.13
 
