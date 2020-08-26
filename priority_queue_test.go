@@ -10,6 +10,8 @@ import (
 
 func TestMassEnqueue(t *testing.T) {
 
+	fmt.Println(time.Now().Unix())
+
 	file := fmt.Sprintf("test_db_%d", time.Now().UnixNano())
 	pq, err := OpenPriorityQueue(file, ASC)
 	if err != nil {
@@ -35,21 +37,21 @@ func TestEnqueueDequeSameLevel(t *testing.T) {
 	defer pq.Drop()
 
 	for p := 0; p <= 10000; p++ {
-		if _, err = pq.EnqueueString(int64(p), "test"); err != nil {
+		if _, err = pq.EnqueueString(int64(p+1598456756), "test"); err != nil {
 			t.Error(err)
 		}
-		if _, err = pq.EnqueueString(int64(p), "test"); err != nil {
+		if _, err = pq.EnqueueString(int64(p+1598456756), "test"); err != nil {
 			t.Error(err)
 		}
 	}
 	for p := 0; p <= 10000; p++ {
 		if item, err := pq.Dequeue(); err == nil {
-			if item.Priority != int64(p) {
+			if item.Priority != int64(p+1598456756) {
 				t.Error("Incorrect Priority Dequeue")
 			}
 		}
 		if item, err := pq.Dequeue(); err == nil {
-			if item.Priority != int64(p) {
+			if item.Priority != int64(p+1598456756) {
 				t.Error("Incorrect Priority Dequeue")
 			}
 		}

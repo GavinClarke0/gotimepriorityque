@@ -267,6 +267,7 @@ func getNextItem(pq *PriorityQueue) (*PriorityItem, error) {
 	if pq.levelMap[priority.(*orderLevel).priority] == nil {
 		return nil, ErrEmpty
 	}
+
 	level := pq.levelMap[priority.(*orderLevel).priority]
 
 	id := (*level).head + 1
