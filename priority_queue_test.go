@@ -10,6 +10,8 @@ import (
 
 func TestMassEnqueue(t *testing.T) {
 
+	fmt.Println(time.Now().Unix())
+
 	file := fmt.Sprintf("test_db_%d", time.Now().UnixNano())
 	pq, err := OpenPriorityQueue(file, ASC)
 	if err != nil {
@@ -35,21 +37,21 @@ func TestEnqueueDequeSameLevel(t *testing.T) {
 	defer pq.Drop()
 
 	for p := 0; p <= 10000; p++ {
-		if _, err = pq.EnqueueString(int64(p), "test"); err != nil {
+		if _, err = pq.EnqueueString(int64(p+1598456756), "test"); err != nil {
 			t.Error(err)
 		}
-		if _, err = pq.EnqueueString(int64(p), "test"); err != nil {
+		if _, err = pq.EnqueueString(int64(p+1598456756), "test"); err != nil {
 			t.Error(err)
 		}
 	}
 	for p := 0; p <= 10000; p++ {
 		if item, err := pq.Dequeue(); err == nil {
-			if item.Priority != int64(p) {
+			if item.Priority != int64(p+1598456756) {
 				t.Error("Incorrect Priority Dequeue")
 			}
 		}
 		if item, err := pq.Dequeue(); err == nil {
-			if item.Priority != int64(p) {
+			if item.Priority != int64(p+1598456756) {
 				t.Error("Incorrect Priority Dequeue")
 			}
 		}
@@ -66,12 +68,12 @@ func TestEnqueueDeque(t *testing.T) {
 	}
 	defer pq.Drop()
 
-	for p := 0; p <= 10000; p++ {
+	for p := 0; p <= 50000; p++ {
 		if _, err = pq.EnqueueString(int64(p), "test"); err != nil {
 			t.Error(err)
 		}
 	}
-	for p := 0; p <= 10000; p++ {
+	for p := 0; p <= 50000; p++ {
 		if item, err := pq.Dequeue(); err == nil {
 			if item.Priority != int64(p) {
 				t.Error("Incorrect Priority Dequeue")
@@ -89,7 +91,7 @@ func TestAlternatingEnqueueDeque(t *testing.T) {
 	}
 	defer pq.Drop()
 
-	for p := 0; p <= 10000; p++ {
+	for p := 0; p <= 50000; p++ {
 		if _, err = pq.EnqueueString(int64(p), "test"); err != nil {
 			t.Error(err)
 		}
@@ -213,48 +215,6 @@ func TestPriorityQueueDequeueAsc(t *testing.T) {
 	}
 }
 
-/*
-
-func TestPriorityQueueDequeueDesc(t *testing.T) {
-	file := fmt.Sprintf("test_db_%d", time.Now().UnixNano())
-	pq, err := OpenPriorityQueue(file, DESC)
-	if err != nil {
-		t.Error(err)
-	}
-	defer pq.Drop()
-
-	for p := 0; p <= 4; p++ {
-		for i := 1; i <= 10; i++ {
-			if _, err = pq.EnqueueString(int64(p), fmt.Sprintf("value for item %d", i)); err != nil {
-				t.Error(err)
-			}
-		}
-	}
-
-	if pq.Length() != 50 {
-		t.Errorf("Expected queue length of 1, got %d", pq.Length())
-	}
-
-	deqItem, err := pq.Dequeue()
-	if err != nil {
-		t.Error(err)
-	}
-
-	if pq.Length() != 49 {
-		t.Errorf("Expected queue length of 49, got %d", pq.Length())
-	}
-
-	compStr := "value for item 1"
-
-	if deqItem.Priority != 4 {
-		t.Errorf("Expected priority priority to be 4, got %d", deqItem.Priority)
-	}
-
-	if deqItem.ToString() != compStr {
-		t.Errorf("Expected string to be '%s', got '%s'", compStr, deqItem.ToString())
-	}
-}
-*/
 func TestPriorityQueueEncodeDecodePointerJSON(t *testing.T) {
 	file := fmt.Sprintf("test_db_%d", time.Now().UnixNano())
 	pq, err := OpenPriorityQueue(file, DESC)

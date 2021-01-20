@@ -198,6 +198,45 @@ func (pq *PriorityQueue) Dequeue() (*PriorityItem, error) {
 	return item, nil
 }
 
+// returns nil if next item priority is less than the provided expired priority level
+func (pq *PriorityQueue) DequeueExpired(expiredPriority int64) (*PriorityItem, error) {
+	pq.RLock()
+	defer pq.RUnlock()
+	// Check if queue is closed.
+	if !pq.isOpen {
+		return nil, ErrDBClosed
+	}
+	// Try to get the next item.
+	item, err := getNextItem(pq)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if (*item).Priority < expiredPriority {
+		return nil, nil
+	}
+
+	// Remove this item from the priority queue.
+	if err = pq.db.Delete(item.Key, nil); err != nil {
+		return nil, err
+	}
+	// peak queue to determine if the current removed item causes a level to be empty
+	// top level being "peaked at here should be ok as i is O(n)
+	priority := Peek(pq.levelOrder)
+
+	if priority != nil {
+
+		level := pq.levelMap[priority.(*orderLevel).priority]
+		(level).head++
+		if (level).length() == 0 {
+			delete(pq.levelMap, priority.(*orderLevel).priority)
+			heap.Pop((*pq).levelOrder)
+		}
+	}
+	return item, nil
+}
+
 // Peek returns the next item in the priority queue without removing it.
 func (pq *PriorityQueue) Peek() (*PriorityItem, error) {
 	pq.RLock()
@@ -210,6 +249,7 @@ func (pq *PriorityQueue) Peek() (*PriorityItem, error) {
 	return getNextItem(pq)
 }
 
+// Get Length of Priority Queues I.E the number of priority queue being used
 func (pq *PriorityQueue) Length() uint64 {
 	pq.RLock()
 	defer pq.RUnlock()
@@ -267,6 +307,7 @@ func getNextItem(pq *PriorityQueue) (*PriorityItem, error) {
 	if pq.levelMap[priority.(*orderLevel).priority] == nil {
 		return nil, ErrEmpty
 	}
+
 	level := pq.levelMap[priority.(*orderLevel).priority]
 
 	id := (*level).head + 1
